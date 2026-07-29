@@ -36,6 +36,10 @@ TEMAS = {
     "Banco Central": _url('"Banco Central" Chile tasa OR TPM OR intervención when:3d'),
     "Economía CL":   _url("economía Chile IPC OR inflación OR IMACEC when:2d"),
     "Real/EM":       _url("real brasileño OR monedas emergentes América Latina when:2d"),
+    # Fed / EE.UU.: el motor #1 del dólar global. Captura la DECISION de tasas,
+    # inflacion (CPI/PCE) y empleo (payrolls) de Estados Unidos.
+    "Fed/EE.UU.":    _url("Reserva Federal Fed tasa de interés OR decisión OR Powell OR Warsh when:1d"),
+    "Macro EE.UU.":  _url("Estados Unidos inflación CPI OR empleo OR nóminas OR PCE when:1d"),
 }
 
 # Palabras que suman relevancia (a mas puntaje, mas arriba aparece).
@@ -47,6 +51,8 @@ KW = {
     "inflación": 2, "ipc": 2, "imacec": 2, "fed": 3, "powell": 2, "china": 2,
     "recesión": 2, "cobre": 3, "litio": 1, "riesgo": 1, "emergentes": 2,
     "real": 1, "brasil": 1, "trump": 1, "arancel": 2, "aranceles": 2,
+    "reserva federal": 3, "warsh": 2, "tasas": 2, "recorte": 2, "hawkish": 2,
+    "empleo": 1, "nóminas": 2, "payrolls": 2, "pce": 2,
 }
 
 
