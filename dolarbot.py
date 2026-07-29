@@ -379,6 +379,23 @@ def _alertas_noticias():
     return len(nuevas)
 
 
+def _alertas_resultados():
+    """Manda AL INSTANTE los resultados de reportes de alto impacto que acaban
+    de salir (Fed, CPI, empleo...). Devuelve cuantos alerto."""
+    try:
+        nuevos = CE.resultados_para_alertar()
+    except Exception as e:
+        print("  (aviso) alerta resultados:", str(e)[:60])
+        return 0
+    if not nuevos:
+        return 0
+    ctx = _precio_contexto()
+    for e in nuevos:
+        send(CE.alerta_resultado_telegram(e, contexto=ctx))
+    CE.marcar_resultados_vistos(nuevos)
+    return len(nuevos)
+
+
 def _informe_completo(primera=False):
     """Analisis completo + alertas de nivel/movimiento + informe a Telegram.
     En el primer informe muestra las noticias actuales (snapshot); despues solo
@@ -407,12 +424,13 @@ def cmd_watch():
     # arranque: informe inicial (snapshot) y SEMBRAR las noticias actuales como
     # vistas, para alertar al instante solo lo que salga DE AHORA EN ADELANTE.
     _informe_completo(primera=True)
-    if C.NEWS_ON:
-        try:
+    try:
+        if C.NEWS_ON:
             NW.marcar_vistas(NW.nuevas_relevantes(min_score=C.NEWS_ALERT_SCORE))
-            print("  (noticias actuales sembradas; alertaré solo las nuevas)")
-        except Exception:
-            pass
+        CE.sembrar_resultados()
+        print("  (noticias y resultados actuales sembrados; alertaré solo lo nuevo)")
+    except Exception:
+        pass
     last_full = time.time()
     while True:
         time.sleep(fast * 60)
@@ -422,11 +440,10 @@ def cmd_watch():
             if now - last_full >= C.WATCH_EVERY_MIN * 60:
                 _informe_completo()
                 last_full = now
-            # 2) alertas instantaneas de noticias (cada ciclo rapido)
-            if C.NEWS_ON:
-                n = _alertas_noticias()
-                if n:
-                    print(f"[{dt.datetime.now():%H:%M}] {n} alerta(s) de noticia al instante")
+            # 2) alertas instantaneas de noticias + resultados (cada ciclo rapido)
+            n = (_alertas_noticias() if C.NEWS_ON else 0) + _alertas_resultados()
+            if n:
+                print(f"[{dt.datetime.now():%H:%M}] {n} alerta(s) al instante")
         except Exception as e:
             print("Error en el ciclo:", e)
 
@@ -436,17 +453,21 @@ def cmd_alertas():
     (noticias urgentes + cruces de nivel), SIN informe completo.
     En la primera corrida (sin news_seen.json) siembra y no alerta, para no
     inundar."""
-    # primera vez en la nube: sembrar noticias actuales y salir sin alertar
-    if C.NEWS_ON and not os.path.exists(NW.SEEN_FILE):
+    # primera vez en la nube: sembrar noticias + resultados actuales y salir
+    if not os.path.exists(NW.SEEN_FILE):
         try:
-            NW.marcar_vistas(NW.nuevas_relevantes(min_score=C.NEWS_ALERT_SCORE))
-            print("Primera corrida: noticias sembradas, sin alertar.")
+            if C.NEWS_ON:
+                NW.marcar_vistas(NW.nuevas_relevantes(min_score=C.NEWS_ALERT_SCORE))
+            CE.sembrar_resultados()
+            print("Primera corrida: noticias y resultados sembrados, sin alertar.")
         except Exception as e:
             print("  (aviso) siembra:", str(e)[:60])
         return
     # 1) alertas instantaneas de noticias
     n_news = _alertas_noticias() if C.NEWS_ON else 0
-    # 2) alertas de nivel / movimiento (necesita el analisis para precio y niveles)
+    # 2) alertas instantaneas de RESULTADOS economicos (Fed, CPI, empleo...)
+    n_res = _alertas_resultados()
+    # 3) alertas de nivel / movimiento (necesita el analisis para precio y niveles)
     n_lvl = 0
     a = A.analizar()
     if a:
@@ -456,7 +477,8 @@ def cmd_alertas():
             n_lvl += 1
         state["last_price"] = a["price"]
         _save_state(state)
-    print(f"[{dt.datetime.now():%H:%M}] alertas: {n_news} noticia(s), {n_lvl} de nivel")
+    print(f"[{dt.datetime.now():%H:%M}] alertas: {n_news} noticia(s), "
+          f"{n_res} resultado(s), {n_lvl} de nivel")
 
 
 def main():

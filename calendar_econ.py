@@ -107,6 +107,71 @@ def proximos(dias=3, solo_alto=False):
     return out
 
 
+RESULT_SEEN_FILE = os.path.join(HERE, "eventos_seen.json")
+
+
+def _clave_ev(e):
+    return f"{e['fecha']:%Y-%m-%d}|{e['titulo']}"
+
+
+def _load_result_seen():
+    try:
+        return set(json.load(open(RESULT_SEEN_FILE)))
+    except Exception:
+        return set()
+
+
+def _save_result_seen(seen):
+    try:
+        json.dump(list(seen)[-300:], open(RESULT_SEEN_FILE, "w"))
+    except Exception:
+        pass
+
+
+def resultados_para_alertar():
+    """Reportes de HOY, ALTO impacto, que YA tienen resultado y NO se han
+    alertado todavia. No los marca: eso lo hace quien los envie."""
+    seen = _load_result_seen()
+    out = []
+    for e in resultados_hoy():
+        if e["impacto"] != "High" or not e["actual"]:
+            continue
+        if _clave_ev(e) in seen:
+            continue
+        out.append(e)
+    return out
+
+
+def marcar_resultados_vistos(evs):
+    seen = _load_result_seen()
+    for e in evs:
+        seen.add(_clave_ev(e))
+    _save_result_seen(seen)
+
+
+def sembrar_resultados():
+    """Marca como vistos TODOS los resultados ya publicados de hoy (para no
+    alertar retroactivamente en la primera corrida)."""
+    marcar_resultados_vistos([e for e in resultados_hoy() if e["actual"]])
+
+
+def alerta_resultado_telegram(e, contexto=""):
+    """Formatea el resultado de un reporte como alerta instantanea (HTML)."""
+    tag = "🥇" if e["es_cobre"] else "💵"
+    interp = f" — <b>{e['interp']}</b>" if e["interp"] else ""
+    ref = []
+    if e["forecast"]:
+        ref.append(f"esperado {e['forecast']}")
+    if e["previous"]:
+        ref.append(f"previo {e['previous']}")
+    ref = f" ({', '.join(ref)})" if ref else ""
+    L = [f"🚨 {tag} <b>RESULTADO: {e['titulo']}</b>",
+         f"<b>{e['actual']}</b>{interp}{ref}"]
+    if contexto:
+        L.append(contexto)
+    return "\n".join(L)
+
+
 def _num(s):
     """Convierte '3.75%', '250K', '2.1M' a numero. None si no se puede."""
     if not s:
