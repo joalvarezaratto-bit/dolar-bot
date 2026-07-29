@@ -171,6 +171,15 @@ def _fmt_analisis(a, con_ia=True, con_noticias=True, solo_nuevas=False):
         for rg in a["riesgos"][:5]:
             L.append(f"  • {rg}")
 
+    # reportes de HOY que ya salieron (con su resultado)
+    try:
+        blq_hoy = CE.bloque_resultados_telegram()
+        if blq_hoy:
+            L.append("")
+            L.append(blq_hoy)
+    except Exception as e:
+        print("  (aviso) resultados de hoy fallaron:", str(e)[:60])
+
     # proximos reportes economicos
     try:
         blq = CE.bloque_telegram(dias=3)
@@ -291,8 +300,18 @@ def cmd_print():
         print("\nRiesgos:")
         for rg in a["riesgos"]:
             print(f"  ⚠️ {rg}")
+    try:
+        import calendar_econ as CE
+        hoy = CE.resultados_hoy()
+        if hoy:
+            print("\nReportes de HOY (ya salieron):")
+            for e in hoy[:6]:
+                res = f"{e['actual']} ({e['interp']})" if e['actual'] else "⏳ pendiente"
+                print(f"  [{e['impacto']:6}] {e['hora']} {e['titulo']}: {res}")
+    except Exception:
+        pass
     if a.get("eventos"):
-        print("\nPróximos reportes:")
+        print("\nPróximos reportes (vienen):")
         for e in a["eventos"][:6]:
             print(f"  [{e['impacto']:6}] {e['cuando']} {e['hora']} {e['titulo']}")
     if C.NEWS_ON:
