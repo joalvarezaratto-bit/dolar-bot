@@ -1,0 +1,43 @@
+name: Alertas dolar (cada 5 min)
+
+# Revisa noticias urgentes y cruces de nivel del USD/CLP cada ~5 minutos.
+# GitHub Actions no corre procesos eternos: cada ejecucion es fresca, por eso
+# el estado (que ya se aviso) se GUARDA commiteandolo de vuelta al repo.
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"   # cada ~5 min (lo mas rapido gratis en Actions)
+  workflow_dispatch:         # boton para correrlo a mano desde GitHub
+
+# Permite guardar el estado (news_seen.json, state.json) de vuelta al repo.
+permissions:
+  contents: write
+
+# Evita que dos corridas choquen (comparten el mismo estado en git).
+concurrency:
+  group: dolarbot-estado
+  cancel-in-progress: false
+
+jobs:
+  alertas:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - name: Revisar y alertar
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          CHAT_ID: ${{ secrets.CHAT_ID }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python dolarbot.py alertas
+      - name: Recordar lo ya avisado
+        run: |
+          git config user.name "dolar-bot"
+          git config user.email "dolar-bot@users.noreply.github.com"
+          git pull --rebase --autostash || true
+          git add news_seen.json state.json calendar_cache.json || true
+          git commit -m "estado: alertas ya avisadas" || echo "sin cambios"
+          git push || echo "nada que subir"

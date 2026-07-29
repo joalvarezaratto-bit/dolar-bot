@@ -1,0 +1,12 @@
+# NUNCA subir: tus tokens
+secrets_local.py
+
+# Cachés y temporales (se regeneran solos)
+market_cache.json
+ai_breaker.json
+usdclp.png
+__pycache__/
+*.pyc
+
+# OJO: state.json, news_seen.json y calendar_cache.json SI se versionan:
+# son el "estado" que la nube commitea de vuelta para recordar qué ya avisó.

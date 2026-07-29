@@ -1,0 +1,40 @@
+name: Informe dolar (cada 30 min)
+
+# Manda el informe completo del USD/CLP (analisis + riesgos + reportes +
+# Fibonacci + grafico + noticias) cada 30 minutos.
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"   # cada 30 min
+  workflow_dispatch:          # boton para correrlo a mano
+
+permissions:
+  contents: write
+
+concurrency:
+  group: dolarbot-estado      # mismo grupo que alertas: nunca corren a la vez
+  cancel-in-progress: false
+
+jobs:
+  informe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - name: Enviar informe completo
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          CHAT_ID: ${{ secrets.CHAT_ID }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python dolarbot.py report
+      - name: Guardar estado
+        run: |
+          git config user.name "dolar-bot"
+          git config user.email "dolar-bot@users.noreply.github.com"
+          git pull --rebase --autostash || true
+          git add news_seen.json state.json calendar_cache.json || true
+          git commit -m "estado: informe enviado" || echo "sin cambios"
+          git push || echo "nada que subir"
