@@ -37,7 +37,8 @@ jobs:
         run: |
           git config user.name "dolar-bot"
           git config user.email "dolar-bot@users.noreply.github.com"
-          git pull --rebase --autostash || true
+          # 1) commitear el estado PRIMERO (con el cambio aun en el working tree)
           git add news_seen.json state.json eventos_seen.json || true
-          git commit -m "estado: alertas ya avisadas" || echo "sin cambios"
-          git push || echo "nada que subir"
+          git commit -m "estado: alertas ya avisadas" || { echo "sin cambios"; exit 0; }
+          # 2) recien ahora sincronizar (working tree ya limpio) y subir, con reintento
+          git push || (git pull --rebase --autostash && git push) || echo "no se pudo subir, la proxima corrida reintenta"
