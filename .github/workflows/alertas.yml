@@ -37,8 +37,12 @@ jobs:
         run: |
           git config user.name "dolar-bot"
           git config user.email "dolar-bot@users.noreply.github.com"
-          # 1) commitear el estado PRIMERO (con el cambio aun en el working tree)
-          git add news_seen.json state.json eventos_seen.json || true
+          # 1) commitear el estado PRIMERO. Cada archivo POR SEPARADO: si uno
+          #    no existe todavia (ej. eventos_seen.json), no debe bloquear a los
+          #    demas (git add es atomico y fallaria con todos juntos).
+          git add news_seen.json 2>/dev/null || true
+          git add state.json 2>/dev/null || true
+          git add eventos_seen.json 2>/dev/null || true
           git commit -m "estado: alertas ya avisadas" || { echo "sin cambios"; exit 0; }
           # 2) recien ahora sincronizar (working tree ya limpio) y subir, con reintento
           git push || (git pull --rebase --autostash && git push) || echo "no se pudo subir, la proxima corrida reintenta"
