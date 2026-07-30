@@ -126,6 +126,21 @@ def _estado_mercado_line(a):
     return f"🔴 Mercado CLP cerrado — precio de referencia{txt}"
 
 
+def _mercado_fresco(a):
+    """True si el mercado CLP está abierto y el dato es reciente (para mostrar
+    info intradía solo cuando es real, no rancia)."""
+    d = a.get("usdclp") or {}
+    ahora = dt.datetime.now(_TZ)
+    abierto = ahora.weekday() < 5 and 9 <= ahora.hour < 17
+    mt = d.get("market_time")
+    if mt:
+        edad = (dt.datetime.now(dt.timezone.utc)
+                - dt.datetime.fromtimestamp(mt, dt.timezone.utc)).total_seconds() / 60
+        if edad > 20:
+            return False
+    return abierto
+
+
 def _rango_dia_line(a):
     """Rango de la sesión del USD/CLP: dónde abrió, máximo, mínimo y dónde va
     ahora. Usa los campos en vivo de Yahoo y, si faltan, la vela del día."""
@@ -186,6 +201,15 @@ def _fmt_analisis(a, con_ia=True, con_noticias=True, solo_nuevas=False):
     delta = _delta_line(a)
     if delta:
         L.append(delta)
+    # pulso intradía (solo si el mercado está operando de verdad)
+    if _mercado_fresco(a):
+        try:
+            import intraday as IN
+            pl = IN.linea_telegram()
+            if pl:
+                L.append(pl)
+        except Exception as e:
+            print("  (aviso) intradía:", str(e)[:60])
     L.append("")
     L.append(f"Estado ahora: <b>{a['sesgo']}</b>")
     L.append(f"<i>Fuerza de la presión: {a['score']:+d}/100 (describe el momento, no predice)</i>")
