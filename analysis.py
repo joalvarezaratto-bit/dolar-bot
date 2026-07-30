@@ -159,17 +159,6 @@ def analizar():
                 correls[k] = M.correlacion(r_clp, M.retornos(arr[k]))
         valor = M.valor_justo(arr)
 
-    def _mov_z(nombre):
-        """Que tan fuerte (en desviaciones) se movio un motor en los ultimos 5 dias."""
-        if arr is None or nombre not in arr:
-            return 0.0
-        r = M.retornos(arr[nombre])
-        base = r[-40:] if len(r) >= 40 else r
-        sd = float(base.std()) if len(base) else 0.0
-        if sd == 0 or len(r) < 5:
-            return 0.0
-        return float(r[-5:].sum() / (sd * math.sqrt(5)))
-
     # ----- construccion del puntaje (senales que suman o restan) -----
     senales = []   # cada una: (texto, aporte)  aporte>0 empuja USD/CLP arriba
     score = 0.0
@@ -208,7 +197,11 @@ def analizar():
         if k not in correls or not dat or not dat.get("price"):
             continue
         corr = correls[k]
-        z = _mov_z(k)
+        # z = el movimiento de HOY del motor (el mismo % que se muestra),
+        # normalizado por su volatilidad diaria tipica. Asi la direccion del
+        # empuje SIEMPRE es coherente con el % mostrado.
+        sd = float(M.retornos(arr[k]).std()) if (arr is not None and k in arr) else 0.0
+        z = (dat["change_pct"] / 100.0 / sd) if sd > 0 else 0.0
         ap = max(-16, min(16, corr * z * 12))
         if abs(ap) < 1:
             continue
@@ -224,9 +217,9 @@ def analizar():
         ap = -z * 6.5   # si el dolar esta CARO vs motores -> presion a corregir a la baja
         score += ap
         if valor["z"] >= 1:
-            senales.append((f"Dólar CARO vs sus motores (~{valor['gap']:+.0f} sobre su valor justo {valor['predicho']:.0f}) → posible corrección", ap))
+            senales.append((f"Dólar CARO vs sus motores hoy (~{valor['gap']:+.0f} sobre su valor justo {valor['predicho']:.0f})", ap))
         elif valor["z"] <= -1:
-            senales.append((f"Dólar BARATO vs sus motores (~{valor['gap']:+.0f} bajo su valor justo {valor['predicho']:.0f}) → posible rebote", ap))
+            senales.append((f"Dólar BARATO vs sus motores hoy (~{valor['gap']:+.0f} bajo su valor justo {valor['predicho']:.0f})", ap))
 
     # 5) FIBONACCI: si el precio esta pegado a un nivel fib, es zona de reaccion
     fib = M.fibonacci(usdclp["candles"])
@@ -237,17 +230,20 @@ def analizar():
 
     score = int(max(-100, min(100, round(score))))
 
-    # ----- traduccion del puntaje a un sesgo legible -----
+    # ----- traduccion del puntaje a la PRESION ACTUAL (nowcast, no prediccion) -----
+    # Describe lo que los motores (cobre/DXY/real) + tendencia estan haciendo
+    # AHORA sobre el peso. NO es un pronostico: el backtest mostro que este
+    # puntaje no anticipa el movimiento del dia siguiente.
     if score >= 40:
-        sesgo, emoji = "ALCISTA (dolar sube / peso debil)", "🔴"
+        sesgo, emoji = "Presión AL ALZA fuerte (motores empujan el dólar arriba ahora)", "🔴"
     elif score >= 15:
-        sesgo, emoji = "Levemente alcista", "🟠"
+        sesgo, emoji = "Presión al alza leve", "🟠"
     elif score <= -40:
-        sesgo, emoji = "BAJISTA (dolar baja / peso fuerte)", "🟢"
+        sesgo, emoji = "Presión A LA BAJA fuerte (motores empujan el dólar abajo ahora)", "🟢"
     elif score <= -15:
-        sesgo, emoji = "Levemente bajista", "🟢"
+        sesgo, emoji = "Presión a la baja leve", "🟢"
     else:
-        sesgo, emoji = "NEUTRAL / sin direccion clara", "⚪"
+        sesgo, emoji = "Motores equilibrados / sin presión clara", "⚪"
 
     sop, res = niveles_sr(usdclp["candles"], price)
 

@@ -99,7 +99,8 @@ def _fmt_analisis(a, con_ia=True, con_noticias=True, solo_nuevas=False):
     """Arma el texto del analisis para Telegram (HTML)."""
     L = []
     L.append(f"{a['emoji']} <b>USD/CLP · {a['price']:,.2f}</b>  <i>({a['change_pct']:+.2f}% hoy)</i>")
-    L.append(f"Sesgo: <b>{a['sesgo']}</b>  ·  puntaje {a['score']:+d}/100")
+    L.append(f"Estado ahora: <b>{a['sesgo']}</b>")
+    L.append(f"<i>Fuerza de la presión: {a['score']:+d}/100 (describe el momento, no predice)</i>")
 
     # termometro cuantitativo: RSI, volatilidad y valor justo
     stats = []
@@ -209,8 +210,10 @@ def _fmt_analisis(a, con_ia=True, con_noticias=True, solo_nuevas=False):
             L.append(f"🤖 <i>{c}</i>")
 
     L.append("")
-    L.append("<i>Mapa de probabilidades por reglas + correlaciones (cobre inverso; DXY y real directos). "
-             "No es predicción ni consejo de inversión.</i>")
+    L.append("<i>📌 Tablero de CONTEXTO en tiempo real: muestra qué mueve al peso ahora "
+             "(cobre inverso; DXY y real directos), sus niveles y las noticias. "
+             "NO predice a dónde va el dólar — un backtest confirmó que el estado no anticipa "
+             "el movimiento del día siguiente. No es consejo de inversión.</i>")
     return "\n".join(L)
 
 
@@ -275,7 +278,7 @@ def cmd_print():
         return
     # version consola sin HTML
     print(f"\nUSD/CLP: {a['price']:.2f}  ({a['change_pct']:+.2f}%)")
-    print(f"Sesgo: {a['sesgo']}  (puntaje {a['score']:+d}/100)")
+    print(f"Estado ahora: {a['sesgo']}  (fuerza {a['score']:+d}/100, describe el momento, no predice)")
     cobre = a.get("cobre") or {}
     dxy = a.get("dxy") or {}
     brl = a.get("brl") or {}
