@@ -17,6 +17,7 @@ import re
 import json
 import time
 import html
+import unicodedata
 import requests
 import feedparser
 
@@ -60,17 +61,98 @@ def _norm(t):
     return re.sub(r"\s+", " ", t.lower()).strip()
 
 
+# ---------------------------------------------------------------------
+#  DEDUPLICACION POR HISTORIA (no por titulo exacto).
+#  La MISMA noticia la publican 20 medios con titulos distintos. Para no
+#  repetirla, reducimos cada titular a su "firma": el conjunto de palabras
+#  con contenido (sin articulos ni preposiciones, sin tildes). Dos titulares
+#  son la MISMA historia si comparten suficientes palabras.
+# ---------------------------------------------------------------------
+_STOP = set((
+    "de la el en y a los las un una por con para que se su del al lo es mas "
+    "ante sobre hoy tras entre como o u ni le ya son fue ser este esta esto "
+    "estos estas segun hasta desde muy no si tras cual sus e mientras pese "
+    "aun aunque hay ha han sin dia dias tan solo esa ese uno dos"
+).split())
+
+
+def _sin_tildes(s):
+    return "".join(c for c in unicodedata.normalize("NFD", s)
+                   if unicodedata.category(c) != "Mn")
+
+
+def _stem(w):
+    """Stem minimo en español: unifica plural/singular (tasas->tasa, cambios->
+    cambio) para que el mismo hecho matchee aunque cambie el numero."""
+    if len(w) > 4 and w.endswith("s"):
+        w = w[:-1]
+    return w
+
+
+# Temas canonicos: cualquier SINONIMO del disparador agrega el mismo token,
+# asi "Fed", "Reserva Federal", "Powell" y "FOMC" caen todos en "@fed" y el bot
+# los reconoce como la misma historia aunque el titular use palabras distintas.
+# Solo temas de EVENTO (poco frecuentes: suele haber uno por dia); el dolar y el
+# cobre NO van aca (son demasiado frecuentes) y se agrupan por parecido normal.
+_CANON = {
+    "@fed":    ("fed", "reserva federal", "federal reserve", "fomc", "powell", "warsh"),
+    "@bcch":   ("banco central", "tpm"),
+    "@ipc":    ("ipc", "imacec", "pce", "precios al consumidor"),
+    "@empleo": ("empleo", "desempleo", "nomina", "payroll", "cesantia"),
+}
+_CANON_TOKENS = frozenset(_CANON)
+
+
+def _firma(titulo):
+    """Conjunto de palabras con contenido del titular + su tema canonico
+    (la 'huella' de la historia)."""
+    t = _sin_tildes(_norm(titulo))
+    palabras = re.findall(r"[a-z0-9%]+", t)
+    base = set(_stem(w) for w in palabras if len(w) >= 3 and w not in _STOP)
+    for tok, disparadores in _CANON.items():
+        if any(g in t for g in disparadores):
+            base.add(tok)
+    return frozenset(base)
+
+
+_UMBRAL_DUP = 0.5      # 50% de las palabras del titular mas corto coinciden
+_MIN_COMPARTIDAS = 3   # y al menos 3 palabras en comun -> misma historia
+
+
+def _es_misma_historia(firma, firmas_previas):
+    """True si `firma` es la misma historia que alguna ya vista/mostrada."""
+    canon = firma & _CANON_TOKENS
+    for p in firmas_previas:
+        comun = len(firma & p)
+        # mismo tema de evento (@fed, @bcch...) + al menos una palabra mas
+        if (canon & p) and comun >= 2:
+            return True
+        # o titulares muy parecidos en general
+        if comun >= _MIN_COMPARTIDAS and comun / min(len(firma), len(p)) >= _UMBRAL_DUP:
+            return True
+    return False
+
+
 def _load_seen():
+    """Devuelve lista de firmas (frozensets) ya vistas. Convierte el formato
+    viejo (titulos en texto) al vuelo."""
     try:
-        return set(json.load(open(SEEN_FILE)))
+        data = json.load(open(SEEN_FILE))
     except Exception:
-        return set()
+        return []
+    out = []
+    for e in data:
+        if isinstance(e, list):
+            out.append(frozenset(e))
+        elif isinstance(e, str):
+            out.append(_firma(e))
+    return out
 
 
-def _save_seen(seen):
+def _save_seen(firmas):
     try:
-        # guarda solo las ultimas ~400 para no crecer sin fin
-        json.dump(list(seen)[-400:], open(SEEN_FILE, "w"))
+        # guarda solo las ultimas ~500 historias para no crecer sin fin
+        json.dump([sorted(f) for f in firmas[-500:]], open(SEEN_FILE, "w"))
     except Exception:
         pass
 
@@ -105,10 +187,14 @@ def _fuente(entry, titulo):
 
 
 def buscar(top=6, min_score=3):
-    """Devuelve lista de dicts {titulo, fuente, link, score, nuevo} ordenada por
-    relevancia. `nuevo`=True si no se habia mostrado antes."""
+    """Devuelve lista de dicts {titulo, fuente, link, score, firma, nuevo}
+    ordenada por relevancia, con UNA sola nota por historia (agrupa los mismos
+    hechos publicados por distintos medios). `nuevo`=True si la historia no se
+    habia mostrado antes."""
     seen = _load_seen()
-    vistos_ahora = {}
+
+    # 1) juntar candidatos de todos los temas
+    candidatos = []
     for tema, url in TEMAS.items():
         try:
             d = feedparser.parse(requests.get(url, headers=UA, timeout=15).content)
@@ -117,33 +203,40 @@ def buscar(top=6, min_score=3):
         for e in d.entries[:20]:
             titulo_full = html.unescape(e.get("title", ""))
             fuente = _fuente(e, titulo_full)
-            # limpia el " - Fuente" del final para mostrar el titular limpio
             titulo = titulo_full.rsplit(" - ", 1)[0] if " - " in titulo_full else titulo_full
-            key = _norm(titulo)[:90]
-            if not titulo or key in vistos_ahora:
+            if not titulo or not _es_de_chile(titulo_full):
                 continue
-            if not _es_de_chile(titulo_full):
-                continue   # descarta peso mexicano/argentino/etc sin contexto chileno
             sc = _score(titulo_full)
             if sc < min_score:
                 continue
-            vistos_ahora[key] = {
-                "titulo": titulo.strip(),
-                "fuente": fuente.strip(),
-                "link": e.get("link", ""),
-                "score": sc,
-                "tema": tema,
-                "nuevo": key not in seen,
-            }
-    items = sorted(vistos_ahora.values(), key=lambda x: -x["score"])[:top]
-    return items
+            firma = _firma(titulo)
+            if len(firma) < 2:
+                continue
+            candidatos.append({
+                "titulo": titulo.strip(), "fuente": fuente.strip(),
+                "link": e.get("link", ""), "score": sc, "tema": tema, "firma": firma,
+            })
+
+    # 2) del mas relevante al menos, quedarse con UNA nota por historia
+    candidatos.sort(key=lambda x: -x["score"])
+    firmas_batch = []
+    unicos = []
+    for c in candidatos:
+        if _es_misma_historia(c["firma"], firmas_batch):
+            continue   # ya tenemos esta historia (otro medio) -> se descarta
+        firmas_batch.append(c["firma"])
+        c["nuevo"] = not _es_misma_historia(c["firma"], seen)
+        unicos.append(c)
+
+    return unicos[:top]
 
 
 def marcar_vistas(items):
-    """Guarda como vistas las noticias ya mostradas (para no repetirlas)."""
+    """Guarda como vistas las HISTORIAS ya mostradas (por su firma), para no
+    repetirlas aunque las publique otro medio con otro titulo."""
     seen = _load_seen()
     for it in items:
-        seen.add(_norm(it["titulo"])[:90])
+        seen.append(it.get("firma") or _firma(it["titulo"]))
     _save_seen(seen)
 
 
