@@ -94,11 +94,99 @@ def _hoy():
     return dt.datetime.now().strftime("%Y-%m-%d")
 
 
+# --------------------------- info "del momento" ----------------------
+try:
+    from zoneinfo import ZoneInfo
+    _TZ = ZoneInfo(C.TIMEZONE)
+except Exception:
+    _TZ = dt.timezone(dt.timedelta(hours=-4))   # respaldo: Chile continental
+
+
+def _estado_mercado_line(a):
+    """Dice si el mercado CLP está abierto y qué tan fresco es el precio, para
+    no mostrar un precio 'rancio' como si fuera en vivo."""
+    d = a.get("usdclp") or {}
+    ahora = dt.datetime.now(_TZ)
+    abierto = ahora.weekday() < 5 and 9 <= ahora.hour < 17   # lun-vie 9-17 Chile
+    txt = ""
+    fresco = True
+    mt = d.get("market_time")
+    if mt:
+        t_dato = dt.datetime.fromtimestamp(mt, dt.timezone.utc).astimezone(_TZ)
+        edad = (dt.datetime.now(dt.timezone.utc)
+                - dt.datetime.fromtimestamp(mt, dt.timezone.utc)).total_seconds() / 60
+        txt = f" · dato {t_dato:%H:%M}"
+        if edad > 20:
+            fresco = False
+            txt += f" (hace {int(edad)} min)"
+    if abierto and fresco:
+        return f"🟢 Mercado CLP abierto{txt}"
+    if abierto and not fresco:
+        return f"🟡 Abierto, dato algo atrasado{txt}"
+    return f"🔴 Mercado CLP cerrado — precio de referencia{txt}"
+
+
+def _rango_dia_line(a):
+    """Rango de la sesión del USD/CLP: dónde abrió, máximo, mínimo y dónde va
+    ahora. Usa los campos en vivo de Yahoo y, si faltan, la vela del día."""
+    d = a.get("usdclp") or {}
+    velas = d.get("candles") or []
+    hoy = velas[-1] if velas else {}
+    op = d.get("day_open") or hoy.get("o")
+    hi = d.get("day_high") or hoy.get("h")
+    lo = d.get("day_low") or hoy.get("l")
+    px = a["price"]
+    # solo mostrar si el rango es REAL (evita velas rancias de mercado cerrado,
+    # donde el máx=mín o la apertura queda fuera del rango).
+    if not (op and hi and lo) or hi <= lo:
+        return ""
+    if not (lo <= op <= hi and lo <= px <= hi):
+        return ""
+    return f"📊 Sesión: abrió {op:,.1f} · máx {hi:,.1f} · mín {lo:,.1f} · ahora {px:,.1f}"
+
+
+def _delta_line(a):
+    """Qué se movió desde el informe anterior (dólar, cobre, DXY en el intervalo)."""
+    prev = _load_state().get("last_report")
+    if not prev or not prev.get("clp"):
+        return ""
+    mins = ""
+    if prev.get("ts"):
+        m = (time.time() - prev["ts"]) / 60
+        mins = f" (hace {int(m)} min)" if m < 600 else ""
+    partes = [f"dólar {(a['price']/prev['clp']-1)*100:+.2f}%"]
+    cob = a.get("cobre") or {}
+    if prev.get("cobre") and cob.get("price"):
+        partes.append(f"cobre {(cob['price']/prev['cobre']-1)*100:+.2f}%")
+    dxy = a.get("dxy") or {}
+    if prev.get("dxy") and dxy.get("price"):
+        partes.append(f"DXY {(dxy['price']/prev['dxy']-1)*100:+.2f}%")
+    return f"🔄 vs informe anterior{mins}: " + " · ".join(partes)
+
+
+def _set_snapshot(state, a):
+    """Marca en `state` la foto de este informe (para el delta del próximo)."""
+    state["last_report"] = {"ts": time.time(), "clp": a["price"],
+                            "cobre": (a.get("cobre") or {}).get("price"),
+                            "dxy": (a.get("dxy") or {}).get("price")}
+    state["last_price"] = a["price"]
+
+
 # --------------------------- formato del mensaje ---------------------
 def _fmt_analisis(a, con_ia=True, con_noticias=True, solo_nuevas=False):
     """Arma el texto del analisis para Telegram (HTML)."""
     L = []
     L.append(f"{a['emoji']} <b>USD/CLP · {a['price']:,.2f}</b>  <i>({a['change_pct']:+.2f}% hoy)</i>")
+    mkt = _estado_mercado_line(a)
+    if mkt:
+        L.append(mkt)
+    rango = _rango_dia_line(a)
+    if rango:
+        L.append(rango)
+    delta = _delta_line(a)
+    if delta:
+        L.append(delta)
+    L.append("")
     L.append(f"Estado ahora: <b>{a['sesgo']}</b>")
     L.append(f"<i>Fuerza de la presión: {a['score']:+d}/100 (describe el momento, no predice)</i>")
 
@@ -348,9 +436,9 @@ def cmd_once(con_grafico=False):
         except Exception as e:
             print("Fallo el grafico:", e)
     send(_fmt_analisis(a, con_noticias=C.NEWS_ON))
-    state["last_price"] = a["price"]
+    _set_snapshot(state, a)
     _save_state(state)
-    print(f"Enviado. USD/CLP {a['price']:.2f}, sesgo: {a['sesgo']}")
+    print(f"Enviado. USD/CLP {a['price']:.2f}, estado: {a['sesgo']}")
 
 
 def _precio_contexto():
@@ -412,7 +500,7 @@ def _informe_completo(primera=False):
     for al in alertas:
         send(al)
     send(_fmt_analisis(a, con_noticias=C.NEWS_ON, solo_nuevas=not primera))
-    state["last_price"] = a["price"]
+    _set_snapshot(state, a)
     _save_state(state)
     print(f"[{dt.datetime.now():%H:%M}] INFORME · USD/CLP {a['price']:.2f} "
           f"sesgo {a['score']:+d} · {len(alertas)} alerta(s) de nivel")

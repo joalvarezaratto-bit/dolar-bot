@@ -75,7 +75,13 @@ def _fetch_yahoo(symbol, interval="1d", rng="6mo"):
             prev = candles[-1]["c"]
         change_pct = ((price - prev) / prev * 100) if prev else 0.0
         return {"symbol": symbol, "price": price, "prev_close": prev,
-                "change_pct": change_pct, "candles": candles, "ts": time.time()}
+                "change_pct": change_pct, "candles": candles, "ts": time.time(),
+                # datos "del momento" para saber frescura y rango del dia
+                "market_time": meta.get("regularMarketTime"),
+                "market_state": meta.get("marketState"),
+                "day_open": meta.get("regularMarketOpen"),
+                "day_high": meta.get("regularMarketDayHigh"),
+                "day_low": meta.get("regularMarketDayLow")}
     except Exception as e:
         print(f"  (aviso) fallo Yahoo {symbol}: {str(e)[:80]}")
         return None
