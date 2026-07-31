@@ -38,6 +38,25 @@ def _chg(closes, n):
     return (closes[-1] / closes[-1 - n] - 1) * 100 if len(closes) > n else None
 
 
+def candles_ohlc(sym, interval="60m", rng="7d"):
+    """Velas intradía con OHLC para graficar. Lista de {t,o,h,l,c}."""
+    try:
+        r = requests.get(f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}",
+                         params={"interval": interval, "range": rng}, headers=UA, timeout=20)
+        res = r.json()["chart"]["result"][0]
+        ts = res["timestamp"]
+        q = res["indicators"]["quote"][0]
+        out = []
+        for i in range(len(ts)):
+            o, h, l, c = q["open"][i], q["high"][i], q["low"][i], q["close"][i]
+            if None in (o, h, l, c):
+                continue
+            out.append({"t": ts[i], "o": o, "h": h, "l": l, "c": c})
+        return out
+    except Exception:
+        return []
+
+
 def pulso():
     """Pulso intradía del USD/CLP + movimiento de la sesión de cobre y DXY.
     Devuelve dict o None si no hay datos."""

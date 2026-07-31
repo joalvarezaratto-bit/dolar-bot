@@ -453,9 +453,16 @@ def cmd_once(con_grafico=False):
     # 1024 chars). El analisis completo va aparte como texto (hasta 4096).
     if con_grafico:
         try:
-            path = CH.make_chart(a, os.path.join(HERE, "usdclp.png"))
+            path = os.path.join(HERE, "usdclp.png")
+            # mercado operando -> grafico de 1h (la sesion); si no, el diario
+            hecho = None
+            if _mercado_fresco(a):
+                hecho = CH.make_chart_intraday(a, path)
+            tipo = "1h" if hecho else "diario"
+            if not hecho:
+                CH.make_chart(a, path)
             pie = (f"{a['emoji']} USD/CLP {a['price']:,.2f} ({a['change_pct']:+.2f}%) · "
-                   f"{a['sesgo']}")
+                   f"gráfico {tipo}")
             send_photo(path, caption=pie)
         except Exception as e:
             print("Fallo el grafico:", e)
