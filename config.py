@@ -68,6 +68,16 @@ WATCH_EVERY_MIN = 30
 TIMEZONE = "America/Santiago"   # hora de Chile
 
 # ---------------------------------------------------------------------
+#  Horario del INFORME grande (hora de Chile). De noche/finde/feriado el
+#  mercado está cerrado y el informe solo repetiría "precio de referencia",
+#  así que NO se envía. Las alertas urgentes de noticias/datos siguen 24/7.
+#  (Enviar `report --gate` respeta este horario; sin --gate siempre envía.)
+# ---------------------------------------------------------------------
+INFORME_HORA_INI = 8    # desde las 08:00
+INFORME_HORA_FIN = 18   # hasta las 18:00 (el último informe sale antes de las 18)
+INFORME_SOLO_DIAS_HABILES = True   # False = también fines de semana
+
+# ---------------------------------------------------------------------
 #  Salud del bot (heartbeat). Cada trabajo (alertas/informe) deja su
 #  "última corrida" en state.json; el otro avisa si lleva demasiado sin correr.
 #  Así, si Yahoo se cae o GitHub apaga un workflow, te ENTERAS (no quedas ciego).

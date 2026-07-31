@@ -129,6 +129,16 @@ def _estado_mercado_line(a):
     return f"🔴 Mercado CLP {motivo} — precio de referencia{txt}"
 
 
+def _en_horario_informe():
+    """True si es horario de enviar el informe grande (8-18 Chile, día hábil)."""
+    ahora = dt.datetime.now(_TZ)
+    feriado = (ahora.strftime("%m-%d") in C.FERIADOS_CL
+               or ahora.strftime("%Y-%m-%d") in C.FERIADOS_CL)
+    if C.INFORME_SOLO_DIAS_HABILES and (ahora.weekday() >= 5 or feriado):
+        return False
+    return C.INFORME_HORA_INI <= ahora.hour < C.INFORME_HORA_FIN
+
+
 def _mercado_fresco(a):
     """True si el mercado CLP está abierto y el dato es reciente (para mostrar
     info intradía solo cuando es real, no rancia)."""
@@ -472,12 +482,24 @@ def cmd_print():
     print()
 
 
-def cmd_once(con_grafico=False):
+def cmd_once(con_grafico=False, gate=False):
     a = A.analizar()
     if not a:
-        print("Sin datos; no envio nada.")
+        state = _load_state()
+        _aviso_sin_datos(state)
+        _save_state(state)
+        print("Sin datos; aviso enviado.")
         return
     state = _load_state()
+    # heartbeat: el informe está VIVO aunque por horario no envíe nada
+    _set_hb(state, "hb_informe")
+    _chequear_salud(state, "hb_alertas", C.HEALTH_ALERTAS_MAX_MIN, "el vigilante de alertas")
+    # gate de horario: de noche/finde/feriado no mandamos el informe (solo ruido)
+    if gate and not _en_horario_informe():
+        _save_state(state)
+        print(f"[{dt.datetime.now(_TZ):%H:%M}] fuera de horario de informe (8-18 Chile); "
+              f"heartbeat actualizado, no envío.")
+        return
     # alertas primero (mas urgentes)
     for al in _revisar_alertas(a, state):
         send(al)
@@ -704,9 +726,9 @@ def main():
     elif cmd == "print":
         cmd_print()
     elif cmd == "once":
-        cmd_once(con_grafico=False)
+        cmd_once(con_grafico=False, gate="--gate" in sys.argv)
     elif cmd == "report":
-        cmd_once(con_grafico=True)
+        cmd_once(con_grafico=True, gate="--gate" in sys.argv)
     elif cmd == "alertas":
         cmd_alertas()
     elif cmd == "watch":
