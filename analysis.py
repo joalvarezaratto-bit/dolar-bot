@@ -124,6 +124,7 @@ def analizar():
     cobre = ds.get(C.SYM_COBRE)
     dxy = ds.get(C.SYM_DXY)
     brl = ds.get(C.SYM_BRL)
+    bono = ds.get(C.SYM_BONO)
 
     if not usdclp or not usdclp.get("price"):
         return None   # sin el dato principal no hay analisis
@@ -133,6 +134,7 @@ def analizar():
     t_cu = _trend(cobre)
     t_dxy = _trend(dxy)
     t_brl = _trend(brl)
+    t_bono = _trend(bono)
 
     # ----- motor cuantitativo: alinear series y medir de verdad -----
     import model as M
@@ -144,6 +146,8 @@ def analizar():
         series["dxy"] = dxy["candles"]
     if brl and brl.get("candles"):
         series["brl"] = brl["candles"]
+    if bono and bono.get("candles"):
+        series["bono"] = bono["candles"]
     _, arr = M.alinear(series)
 
     rsi = M.rsi([c["c"] for c in usdclp["candles"]]) if len(usdclp["candles"]) > 15 else None
@@ -154,7 +158,7 @@ def analizar():
     r_clp = None
     if arr is not None and "clp" in arr:
         r_clp = M.retornos(arr["clp"])
-        for k in ("cobre", "dxy", "brl"):
+        for k in ("cobre", "dxy", "brl", "bono"):
             if k in arr:
                 correls[k] = M.correlacion(r_clp, M.retornos(arr[k]))
         valor = M.valor_justo(arr)
@@ -192,7 +196,8 @@ def analizar():
     #    La correlacion ya trae el signo (cobre negativo, DXY/real positivos),
     #    y su MAGNITUD hace que un motor "pese" mas o menos segun cuanto este
     #    explicando al peso ESTAS semanas.
-    nombres = {"cobre": ("Cobre", cobre), "dxy": ("DXY", dxy), "brl": ("Real (USD/BRL)", brl)}
+    nombres = {"cobre": ("Cobre", cobre), "dxy": ("DXY", dxy), "brl": ("Real (USD/BRL)", brl),
+               "bono": ("Bono 10Y USA", bono)}
     for k, (etq, dat) in nombres.items():
         if k not in correls or not dat or not dat.get("price"):
             continue
@@ -271,11 +276,13 @@ def analizar():
         "cobre": cobre,
         "dxy": dxy,
         "brl": brl,
+        "bono": bono,
         "usdclp": usdclp,
         "trend_clp": t_clp,
         "trend_cu": t_cu,
         "trend_dxy": t_dxy,
         "trend_brl": t_brl,
+        "trend_bono": t_bono,
         "rsi": rsi,
         "atr_pct": atrp,
         "correls": correls,

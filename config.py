@@ -59,6 +59,7 @@ SYM_USDCLP = "USDCLP=X"    # dolar / peso chileno
 SYM_COBRE = "HG=F"         # cobre (futuro COMEX, USD por libra)
 SYM_DXY = "DX-Y.NYB"       # indice dolar (dolar contra canasta de monedas)
 SYM_BRL = "USDBRL=X"       # dolar / real brasileño (el CLP sigue mucho al real)
+SYM_BONO = "^TNX"          # bono del Tesoro USA 10 años (tasas -> apetito por riesgo EM)
 
 # ---------------------------------------------------------------------
 #  Cada cuantos minutos revisa el vigilante (--watch).

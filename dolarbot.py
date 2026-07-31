@@ -280,6 +280,7 @@ def _fmt_analisis(a, con_ia=True, con_noticias=True, solo_nuevas=False):
     cobre = a.get("cobre") or {}
     dxy = a.get("dxy") or {}
     brl = a.get("brl") or {}
+    bono = a.get("bono") or {}
     cr = a.get("correls") or {}
 
     def _corr(k):
@@ -291,6 +292,8 @@ def _fmt_analisis(a, con_ia=True, con_noticias=True, solo_nuevas=False):
         L.append(f"💵 DXY: <b>{dxy['price']:.1f}</b> ({dxy['change_pct']:+.2f}%){_corr('dxy')}")
     if brl.get("price") is not None:
         L.append(f"🇧🇷 Real (USD/BRL): <b>{brl['price']:.2f}</b> ({brl['change_pct']:+.2f}%){_corr('brl')}")
+    if bono.get("price") is not None:
+        L.append(f"🏦 Bono 10Y USA: <b>{bono['price']:.2f}%</b> ({bono['change_pct']:+.2f}%){_corr('bono')}")
     L.append("")
 
     # por que (las senales mas fuertes)
@@ -365,7 +368,7 @@ def _fmt_analisis(a, con_ia=True, con_noticias=True, solo_nuevas=False):
 
     L.append("")
     L.append("<i>📌 Tablero de CONTEXTO en tiempo real: muestra qué mueve al peso ahora "
-             "(cobre inverso; DXY y real directos), sus niveles y las noticias. "
+             "(cobre inverso; DXY, real y bono 10Y directos), sus niveles y las noticias. "
              "NO predice a dónde va el dólar — un backtest confirmó que el estado no anticipa "
              "el movimiento del día siguiente. No es consejo de inversión.</i>")
     return "\n".join(L)
@@ -442,6 +445,9 @@ def cmd_print():
         print(f"DXY:   {dxy['price']:.1f} ({dxy['change_pct']:+.2f}%) - {a['trend_dxy'][0]}")
     if brl.get("price"):
         print(f"Real:  {brl['price']:.2f} USD/BRL ({brl['change_pct']:+.2f}%) - {a['trend_brl'][0]}")
+    bono = a.get("bono") or {}
+    if bono.get("price"):
+        print(f"10Y:   {bono['price']:.2f}% ({bono['change_pct']:+.2f}%) - {a['trend_bono'][0]}")
     print("\nPor que:")
     for txt, ap in a["senales"]:
         print(f"  {'↑' if ap>0 else '↓'} {txt}  [{ap:+.0f}]")

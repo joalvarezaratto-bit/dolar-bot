@@ -69,7 +69,7 @@ def comentar(a, noticias=None):
     brl = a.get("brl") or {}
     cr = a.get("correls") or {}
     v = a.get("valor")
-    corr_txt = ", ".join(f"{k} {cr[k]:+.2f}" for k in ("cobre", "dxy", "brl") if k in cr) or "n/d"
+    corr_txt = ", ".join(f"{k} {cr[k]:+.2f}" for k in ("cobre", "dxy", "brl", "bono") if k in cr) or "n/d"
     valor_txt = "n/d"
     if v:
         estado = "caro" if v["z"] >= 1 else ("barato" if v["z"] <= -1 else "en línea")
@@ -82,6 +82,7 @@ def comentar(a, noticias=None):
         f"Cobre: {cobre.get('price', '?')} USD/lb, tendencia {a['trend_cu'][0]}.\n"
         f"DXY (dolar global): {dxy.get('price', '?')}, tendencia {a['trend_dxy'][0]}.\n"
         f"Real brasileño (USD/BRL): {brl.get('price', '?')}, tendencia {a['trend_brl'][0]}.\n"
+        f"Bono 10 años USA: {(a.get('bono') or {}).get('price', '?')}% (tasas altas -> presión sobre monedas emergentes).\n"
         f"Correlaciones USD/CLP con cada motor (40 dias): {corr_txt}. "
         f"Un motor con correlacion fuerte es el que mas manda ahora.\n"
         f"Valor relativo (regresion cobre+DXY+real): {valor_txt}.\n"
