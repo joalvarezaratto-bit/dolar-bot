@@ -42,12 +42,23 @@ def _fetch_yahoo(symbol, interval="1d", rng="6mo"):
     """Pide a Yahoo el historico + precio en vivo de un simbolo.
     Devuelve dict {price, prev_close, change_pct, candles:[{t,o,h,l,c}], ts}
     o None si falla."""
+    # failover: si query1 falla, se intenta query2 (mismo dato, otro host de Yahoo)
+    res = None
+    for host in ("query1", "query2"):
+        try:
+            r = requests.get(
+                f"https://{host}.finance.yahoo.com/v8/finance/chart/{symbol}",
+                params={"interval": interval, "range": rng},
+                headers=UA, timeout=20)
+            res = r.json()["chart"]["result"][0]
+            break
+        except Exception as e:
+            err = str(e)[:60]
+            continue
+    if res is None:
+        print(f"  (aviso) fallo Yahoo {symbol} en ambos hosts: {err}")
+        return None
     try:
-        r = requests.get(
-            f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}",
-            params={"interval": interval, "range": rng},
-            headers=UA, timeout=20)
-        res = r.json()["chart"]["result"][0]
         meta = res["meta"]
         price = meta.get("regularMarketPrice")
         prev = meta.get("chartPreviousClose") or meta.get("previousClose") or price

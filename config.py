@@ -76,6 +76,20 @@ HEALTH_ALERTAS_MAX_MIN = 25   # el informe avisa si el vigilante (5 min) no corr
 HEALTH_INFORME_MAX_MIN = 80   # las alertas avisan si el informe (30 min) no corre hace esto
 
 # ---------------------------------------------------------------------
+#  Feriados de Chile (mercado cerrado). Fijos por fecha como "MM-DD"; los
+#  movibles (Viernes Santo, algunos lunes) van como fecha completa "AAAA-MM-DD".
+#  Actualizar una vez al año con el calendario nuevo.
+# ---------------------------------------------------------------------
+FERIADOS_CL = {
+    "01-01", "05-01", "05-21", "06-20", "06-29", "07-16", "08-15",
+    "09-18", "09-19", "10-31", "11-01", "12-08", "12-25",
+    # movibles 2026
+    "2026-04-03", "2026-04-04", "2026-10-12", "2026-11-16",
+    # movibles 2027
+    "2027-03-26", "2027-03-27", "2027-10-11",
+}
+
+# ---------------------------------------------------------------------
 #  NIVELES CLAVE del USD/CLP (aprendidos de 2022-2026).
 #     ~1000-1060 = techo estructural (solo se supera en panico)
 #     ~880-840   = piso estructural

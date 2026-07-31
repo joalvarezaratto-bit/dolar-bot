@@ -17,21 +17,30 @@ _CACHE = {}
 TTL = 600   # 10 min: el informe corre cada 30, no hace falta más seguido
 
 
+def _get_chart(sym, interval, rng):
+    """Descarga el chart de Yahoo con failover query1 -> query2."""
+    for host in ("query1", "query2"):
+        try:
+            r = requests.get(f"https://{host}.finance.yahoo.com/v8/finance/chart/{sym}",
+                             params={"interval": interval, "range": rng}, headers=UA, timeout=20)
+            return r.json()["chart"]["result"][0]
+        except Exception:
+            continue
+    return None
+
+
 def _closes(sym, interval="60m", rng="5d"):
     now = time.time()
     c = _CACHE.get(sym)
     if c and now - c["ts"] < TTL:
         return c["closes"]
-    try:
-        r = requests.get(f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}",
-                         params={"interval": interval, "range": rng}, headers=UA, timeout=20)
-        res = r.json()["chart"]["result"][0]
-        q = res["indicators"]["quote"][0]["close"]
-        closes = [x for x in q if x is not None]
-        _CACHE[sym] = {"ts": now, "closes": closes}
-        return closes
-    except Exception:
+    res = _get_chart(sym, interval, rng)
+    if not res:
         return c["closes"] if c else []
+    q = res["indicators"]["quote"][0]["close"]
+    closes = [x for x in q if x is not None]
+    _CACHE[sym] = {"ts": now, "closes": closes}
+    return closes
 
 
 def _chg(closes, n):
@@ -40,10 +49,10 @@ def _chg(closes, n):
 
 def candles_ohlc(sym, interval="60m", rng="7d"):
     """Velas intradía con OHLC para graficar. Lista de {t,o,h,l,c}."""
+    res = _get_chart(sym, interval, rng)
+    if not res:
+        return []
     try:
-        r = requests.get(f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}",
-                         params={"interval": interval, "range": rng}, headers=UA, timeout=20)
-        res = r.json()["chart"]["result"][0]
         ts = res["timestamp"]
         q = res["indicators"]["quote"][0]
         out = []

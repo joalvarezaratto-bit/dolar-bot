@@ -107,7 +107,9 @@ def _estado_mercado_line(a):
     no mostrar un precio 'rancio' como si fuera en vivo."""
     d = a.get("usdclp") or {}
     ahora = dt.datetime.now(_TZ)
-    abierto = ahora.weekday() < 5 and 9 <= ahora.hour < 17   # lun-vie 9-17 Chile
+    feriado = (ahora.strftime("%m-%d") in C.FERIADOS_CL
+               or ahora.strftime("%Y-%m-%d") in C.FERIADOS_CL)
+    abierto = ahora.weekday() < 5 and 9 <= ahora.hour < 17 and not feriado
     txt = ""
     fresco = True
     mt = d.get("market_time")
@@ -123,7 +125,8 @@ def _estado_mercado_line(a):
         return f"🟢 Mercado CLP abierto{txt}"
     if abierto and not fresco:
         return f"🟡 Abierto, dato algo atrasado{txt}"
-    return f"🔴 Mercado CLP cerrado — precio de referencia{txt}"
+    motivo = "feriado en Chile" if feriado else "cerrado"
+    return f"🔴 Mercado CLP {motivo} — precio de referencia{txt}"
 
 
 def _mercado_fresco(a):
@@ -131,7 +134,9 @@ def _mercado_fresco(a):
     info intradía solo cuando es real, no rancia)."""
     d = a.get("usdclp") or {}
     ahora = dt.datetime.now(_TZ)
-    abierto = ahora.weekday() < 5 and 9 <= ahora.hour < 17
+    feriado = (ahora.strftime("%m-%d") in C.FERIADOS_CL
+               or ahora.strftime("%Y-%m-%d") in C.FERIADOS_CL)
+    abierto = ahora.weekday() < 5 and 9 <= ahora.hour < 17 and not feriado
     mt = d.get("market_time")
     if mt:
         edad = (dt.datetime.now(dt.timezone.utc)
@@ -642,11 +647,55 @@ def cmd_alertas():
           f"{n_res} resultado(s), {n_lvl} de nivel")
 
 
+def cmd_selftest():
+    """Revisa que todas las piezas funcionen (datos, análisis, noticias, gráfico)
+    sin mandar nada a Telegram. Útil para verificar la salud de un vistazo."""
+    print("== Auto-test del dolar-bot ==")
+    estado = {"ok": True}
+
+    def check(nombre, fn):
+        try:
+            r = fn()
+            passed = r is not None and r is not False
+            print(f"  [{'✓' if passed else '✗'}] {nombre}")
+            if not passed:
+                estado["ok"] = False
+            return r
+        except Exception as e:
+            print(f"  [✗] {nombre}: ERROR {str(e)[:60]}")
+            estado["ok"] = False
+            return None
+
+    import calendar_econ as CE
+    check("Token de Telegram configurado", lambda: bool(C.TELEGRAM_TOKEN) and bool(C.CHAT_ID))
+    check("Datos USD/CLP (Yahoo, con failover)", lambda: A.ds.get(C.SYM_USDCLP, force=True))
+    check("Datos cobre", lambda: A.ds.get(C.SYM_COBRE))
+    check("Datos DXY", lambda: A.ds.get(C.SYM_DXY))
+    check("Datos real brasileño", lambda: A.ds.get(C.SYM_BRL))
+    a = check("Análisis completo (cerebro)", lambda: A.analizar())
+    check("Noticias (Google News)", lambda: NW.buscar(top=3, min_score=3) is not None)
+    check("Calendario económico (ForexFactory)", lambda: CE.proximos(dias=5) is not None)
+    check("Datos intradía 1h", lambda: len(__import__("intraday").candles_ohlc(C.SYM_USDCLP)) > 0)
+    if a:
+        check("Arma el mensaje del informe", lambda: bool(_fmt_analisis(a, con_noticias=False)))
+        check("Genera el gráfico", lambda: CH.make_chart(a, os.path.join(HERE, "selftest.png")))
+        try:
+            os.remove(os.path.join(HERE, "selftest.png"))
+        except Exception:
+            pass
+    print("\n" + ("✅ TODO OK — el bot está sano." if estado["ok"]
+                  else "✗ HAY FALLAS — revisa las líneas con ✗ arriba."))
+    return estado["ok"]
+
+
 def main():
+    cmd = sys.argv[1] if len(sys.argv) > 1 else "print"
+    if cmd == "selftest":   # corre sin token, para poder diagnosticar
+        cmd_selftest()
+        return
     if C.TELEGRAM_TOKEN in ("", "PEGA_TU_TOKEN_AQUI"):
         print("ERROR: falta tu TELEGRAM_TOKEN en secrets_local.py o en los Secrets")
         sys.exit(1)
-    cmd = sys.argv[1] if len(sys.argv) > 1 else "print"
     if cmd == "test":
         ok = send("✅ <b>dolar-bot conectado.</b> Listo para analizar el USD/CLP.")
         print("Mensaje de prueba enviado." if ok else "Fallo el envio (revisa token/chat_id).")
