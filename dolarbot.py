@@ -179,6 +179,33 @@ def _delta_line(a):
     return f"🔄 vs informe anterior{mins}: " + " · ".join(partes)
 
 
+def _set_hb(state, clave):
+    """Marca la hora de esta corrida exitosa (heartbeat)."""
+    state[clave] = time.time()
+
+
+def _chequear_salud(state, clave_otro, max_min, etiqueta):
+    """Avisa si el OTRO trabajo lleva demasiado sin correr (con freno anti-spam:
+    un aviso por hora como máximo)."""
+    hb = state.get(clave_otro)
+    if not hb:
+        return
+    edad = (time.time() - hb) / 60
+    if edad > max_min and time.time() - state.get("hb_warned", 0) > 3600:
+        send(f"⚠️ <b>Aviso de salud del bot</b>: {etiqueta} no corre hace "
+             f"{int(edad)} min. Revisa GitHub → pestaña <b>Actions</b> (¿workflow "
+             f"apagado o Yahoo caído?).")
+        state["hb_warned"] = time.time()
+
+
+def _aviso_sin_datos(state):
+    """Avisa si no hay datos de mercado (Yahoo), máximo una vez cada 3 horas."""
+    if time.time() - state.get("nodata_warned", 0) > 3 * 3600:
+        send("⚠️ <b>Sin datos de mercado</b> (Yahoo no responde). Lo reintento "
+             "en el próximo ciclo; si sigue, puede ser un problema de la fuente.")
+        state["nodata_warned"] = time.time()
+
+
 def _set_snapshot(state, a):
     """Marca en `state` la foto de este informe (para el delta del próximo)."""
     state["last_report"] = {"ts": time.time(), "clp": a["price"],
@@ -524,14 +551,19 @@ def _informe_completo(primera=False):
     las que no se hayan alertado ya."""
     a = A.analizar()
     if not a:
-        print(f"[{dt.datetime.now():%H:%M}] sin datos, reintento luego")
+        state = _load_state()
+        _aviso_sin_datos(state)
+        _save_state(state)
+        print(f"[{dt.datetime.now():%H:%M}] sin datos, aviso enviado")
         return
     state = _load_state()
+    _chequear_salud(state, "hb_alertas", C.HEALTH_ALERTAS_MAX_MIN, "el vigilante de alertas")
     alertas = _revisar_alertas(a, state)
     for al in alertas:
         send(al)
     send(_fmt_analisis(a, con_noticias=C.NEWS_ON, solo_nuevas=not primera))
     _set_snapshot(state, a)
+    _set_hb(state, "hb_informe")
     _save_state(state)
     print(f"[{dt.datetime.now():%H:%M}] INFORME · USD/CLP {a['price']:.2f} "
           f"sesgo {a['score']:+d} · {len(alertas)} alerta(s) de nivel")
@@ -575,6 +607,7 @@ def cmd_alertas():
     (noticias urgentes + cruces de nivel), SIN informe completo.
     En la primera corrida (sin news_seen.json) siembra y no alerta, para no
     inundar."""
+    state = _load_state()
     # primera vez en la nube: sembrar noticias + resultados actuales y salir
     if not os.path.exists(NW.SEEN_FILE):
         try:
@@ -584,6 +617,8 @@ def cmd_alertas():
             print("Primera corrida: noticias y resultados sembrados, sin alertar.")
         except Exception as e:
             print("  (aviso) siembra:", str(e)[:60])
+        _set_hb(state, "hb_alertas")
+        _save_state(state)
         return
     # 1) alertas instantaneas de noticias
     n_news = _alertas_noticias() if C.NEWS_ON else 0
@@ -593,12 +628,16 @@ def cmd_alertas():
     n_lvl = 0
     a = A.analizar()
     if a:
-        state = _load_state()
         for al in _revisar_alertas(a, state):
             send(al)
             n_lvl += 1
         state["last_price"] = a["price"]
-        _save_state(state)
+    else:
+        _aviso_sin_datos(state)
+    # salud: avisar si el informe de 30 min dejó de correr
+    _chequear_salud(state, "hb_informe", C.HEALTH_INFORME_MAX_MIN, "el informe de 30 min")
+    _set_hb(state, "hb_alertas")
+    _save_state(state)
     print(f"[{dt.datetime.now():%H:%M}] alertas: {n_news} noticia(s), "
           f"{n_res} resultado(s), {n_lvl} de nivel")
 

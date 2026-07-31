@@ -68,6 +68,14 @@ WATCH_EVERY_MIN = 30
 TIMEZONE = "America/Santiago"   # hora de Chile
 
 # ---------------------------------------------------------------------
+#  Salud del bot (heartbeat). Cada trabajo (alertas/informe) deja su
+#  "última corrida" en state.json; el otro avisa si lleva demasiado sin correr.
+#  Así, si Yahoo se cae o GitHub apaga un workflow, te ENTERAS (no quedas ciego).
+# ---------------------------------------------------------------------
+HEALTH_ALERTAS_MAX_MIN = 25   # el informe avisa si el vigilante (5 min) no corre hace esto
+HEALTH_INFORME_MAX_MIN = 80   # las alertas avisan si el informe (30 min) no corre hace esto
+
+# ---------------------------------------------------------------------
 #  NIVELES CLAVE del USD/CLP (aprendidos de 2022-2026).
 #     ~1000-1060 = techo estructural (solo se supera en panico)
 #     ~880-840   = piso estructural

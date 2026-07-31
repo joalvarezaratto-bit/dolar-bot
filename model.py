@@ -27,6 +27,24 @@ def _fecha(ts):
     return dt.datetime.fromtimestamp(ts, dt.timezone.utc).strftime("%Y-%m-%d")
 
 
+def limpiar_velas(candles, factor=3.0):
+    """Recorta 'mechas' absurdas (bad ticks de Yahoo) sin tocar dias volatiles
+    reales. Un pico espurio se limita a `factor` veces el rango tipico desde el
+    cuerpo de la vela. NO altera open/close, solo el maximo/minimo espurio."""
+    if len(candles) < 20:
+        return candles
+    rangos = sorted(c["h"] - c["l"] for c in candles)
+    med = rangos[len(rangos) // 2] or 1.0
+    cap = factor * med
+    out = []
+    for c in candles:
+        o, cl = c["o"], c["c"]
+        techo = max(o, cl) + cap
+        piso = min(o, cl) - cap
+        out.append({**c, "h": min(c["h"], techo), "l": max(c["l"], piso)})
+    return out
+
+
 def alinear(series_por_symbol):
     """Recibe {nombre: candles} y devuelve (fechas, {nombre: array_de_cierres})
     solo con las fechas comunes a TODOS. Asi comparamos manzanas con manzanas."""

@@ -52,7 +52,7 @@ def candles_ohlc(sym, interval="60m", rng="7d"):
             if None in (o, h, l, c):
                 continue
             out.append({"t": ts[i], "o": o, "h": h, "l": l, "c": c})
-        return out
+        return M.limpiar_velas(out)
     except Exception:
         return []
 

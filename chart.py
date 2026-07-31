@@ -6,6 +6,17 @@ zona dorada de Fibonacci (0.5-0.618) y el precio actual destacado.
 import datetime as dt
 import config as C
 
+try:
+    from zoneinfo import ZoneInfo
+    _TZ = ZoneInfo(C.TIMEZONE)
+except Exception:
+    _TZ = dt.timezone(dt.timedelta(hours=-4))   # respaldo: Chile continental
+
+
+def _local(ts):
+    """Convierte epoch UTC a hora de Chile (para las etiquetas del eje)."""
+    return dt.datetime.fromtimestamp(ts, dt.timezone.utc).astimezone(_TZ)
+
 # --- paleta ---
 BG = "#0d1117"
 UP = "#3fb950"       # vela alcista (verde github)
@@ -107,10 +118,7 @@ def make_chart(a, path="usdclp.png", velas=65):
 
     # --- eje X con FECHAS ---
     idxs = list(range(0, n, max(1, n // 7)))
-    etiquetas = []
-    for i in idxs:
-        d = dt.datetime.utcfromtimestamp(candles[i]["t"])
-        etiquetas.append(d.strftime("%d %b"))
+    etiquetas = [_local(candles[i]["t"]).strftime("%d %b") for i in idxs]
     ax.set_xticks(idxs)
     ax.set_xticklabels(etiquetas, color=MUTE, fontsize=9)
 
@@ -173,7 +181,7 @@ def make_chart_intraday(a, path="usdclp.png", barras=90):
     prev_day, start = None, 0
     shade = False
     for i, c in enumerate(candles):
-        day = dt.datetime.utcfromtimestamp(c["t"]).date()
+        day = _local(c["t"]).date()
         if day != prev_day:
             if shade and prev_day is not None:
                 ax.axvspan(start - 0.5, i - 0.5, color="#ffffff", alpha=0.02, zorder=0)
@@ -219,8 +227,8 @@ def make_chart_intraday(a, path="usdclp.png", barras=90):
 
     idxs = list(range(0, n, max(1, n // 7)))
     ax.set_xticks(idxs)
-    ax.set_xticklabels([dt.datetime.utcfromtimestamp(candles[i]["t"]).strftime("%d %Hh")
-                        for i in idxs], color=MUTE, fontsize=9)
+    ax.set_xticklabels([_local(candles[i]["t"]).strftime("%d %Hh") for i in idxs],
+                       color=MUTE, fontsize=9)
 
     signo = "▲" if a["change_pct"] >= 0 else "▼"
     ax.set_title("USD/CLP · velas 1h (sesión reciente)", color=TXT, fontsize=15,

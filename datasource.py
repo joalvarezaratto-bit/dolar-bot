@@ -61,6 +61,13 @@ def _fetch_yahoo(symbol, interval="1d", rng="6mo"):
                 continue   # Yahoo a veces deja huecos: se saltan
             candles.append({"t": ts[i], "o": o, "h": h, "l": l, "c": c})
 
+        # limpiar bad ticks (mechas espurias) antes de cualquier calculo
+        try:
+            import model as _M
+            candles = _M.limpiar_velas(candles)
+        except Exception:
+            pass
+
         # precio en vivo mas fiable = ultimo cierre de vela si falta el meta
         if price is None and candles:
             price = candles[-1]["c"]
