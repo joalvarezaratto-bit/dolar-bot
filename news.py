@@ -279,7 +279,7 @@ def bloque_telegram(top=5, solo_nuevas=False, min_score=3):
     items = items[:top]
     if not items:
         return ("", [])
-    L = ["📰 <b>Noticias relevantes (Chile)</b>"]
+    L = ["📰 <b>NOTICIAS</b>  <i>(Chile)</i>"]
     for it in items:
         fuente = f" · <i>{html.escape(it['fuente'])}</i>" if it["fuente"] else ""
         titulo = html.escape(it["titulo"])

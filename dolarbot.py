@@ -172,7 +172,7 @@ def _rango_dia_line(a):
         return ""
     if not (lo <= op <= hi and lo <= px <= hi):
         return ""
-    return f"📊 Sesión: abrió {op:,.1f} · máx {hi:,.1f} · mín {lo:,.1f} · ahora {px:,.1f}"
+    return f"📊 Día: abrió {op:,.0f} · máx {hi:,.0f} · mín {lo:,.0f}"
 
 
 def _delta_line(a):
@@ -254,7 +254,21 @@ def _fmt_analisis(a, con_ia=True, con_noticias=True, solo_nuevas=False):
             print("  (aviso) intradía:", str(e)[:60])
     L.append("")
     L.append(f"{a['emoji']} <b>{a['sesgo']}</b>  ·  fuerza {a['score']:+d}/100")
-    L.append("<i>(describe el momento actual, no predice)</i>")
+    # lectura rápida: motor dominante + valoración, de un vistazo
+    ap_r = a.get("aportes") or {}
+    nom_r = {"cobre": "el cobre", "dxy": "el DXY", "brl": "el real", "bono": "el bono 10Y"}
+    partes_r = []
+    if ap_r:
+        kd = max(ap_r, key=lambda x: abs(ap_r[x]))
+        if abs(ap_r[kd]) >= 1:
+            partes_r.append(f"manda {nom_r.get(kd, kd)} ({'↑' if ap_r[kd] > 0 else '↓'} dólar)")
+    vr = a.get("valor") or {}
+    if vr.get("z", 0) >= 1:
+        partes_r.append("dólar caro vs motores")
+    elif vr.get("z", 0) <= -1:
+        partes_r.append("dólar barato vs motores")
+    if partes_r:
+        L.append("🔎 <i>" + " · ".join(partes_r) + "</i>")
 
     # ---- MOTORES: valor, correlacion y empuje sobre el dolar de cada uno ----
     cobre = a.get("cobre") or {}
