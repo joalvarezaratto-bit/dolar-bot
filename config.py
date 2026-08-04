@@ -61,6 +61,8 @@ SYM_DXY = "DX-Y.NYB"       # indice dolar (dolar contra canasta de monedas)
 SYM_BRL = "USDBRL=X"       # dolar / real brasileño (el CLP sigue mucho al real)
 SYM_BONO = "^TNX"          # bono del Tesoro USA 10 años (tasas -> apetito por riesgo EM)
 SYM_IRX = "^IRX"           # T-bill EE.UU. 13 semanas (proxy tasa Fed, para el carry)
+SYM_VIX = "^VIX"           # índice del miedo (risk-on / risk-off)
+SYM_SPX = "^GSPC"          # S&P 500 (confirma el apetito por riesgo)
 
 # TPM de Chile de respaldo (%), por si mindicador.cl no responde. Actualízala
 # cuando el Banco Central mueva la tasa (sale en las noticias del bot).

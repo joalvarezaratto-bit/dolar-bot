@@ -294,15 +294,30 @@ def _fmt_analisis(a, con_ia=True, con_noticias=True, solo_nuevas=False):
         L.append(f"🇧🇷 Real (USD/BRL): <b>{brl['price']:.2f}</b> ({brl['change_pct']:+.2f}%){_corr('brl')}")
     if bono.get("price") is not None:
         L.append(f"🏦 Bono 10Y USA: <b>{bono['price']:.2f}%</b> ({bono['change_pct']:+.2f}%){_corr('bono')}")
-    # carry: contexto estratégico (diferencial de tasas), no señal diaria
+    L.append("")
+    # ===== CONTEXTO ESTRATÉGICO (largo plazo): carry + régimen + valoración =====
+    estrat = []
     try:
         import carry as CARRY
         cl = CARRY.carry_line()
         if cl:
-            L.append(cl)
+            estrat.append(cl)
     except Exception as e:
         print("  (aviso) carry:", str(e)[:60])
-    L.append("")
+    try:
+        import estrategico as ES
+        rl = ES.regimen_line()
+        if rl:
+            estrat.append(rl)
+        vl = ES.valoracion_line(a["price"])
+        if vl:
+            estrat.append(vl)
+    except Exception as e:
+        print("  (aviso) estratégico:", str(e)[:60])
+    if estrat:
+        L.append("🧭 <b>Contexto estratégico</b> (semanas/meses)")
+        L.extend(estrat)
+        L.append("")
 
     # por que (las senales mas fuertes)
     if a["senales"]:
@@ -457,10 +472,16 @@ def cmd_print():
     if bono.get("price"):
         print(f"10Y:   {bono['price']:.2f}% ({bono['change_pct']:+.2f}%) - {a['trend_bono'][0]}")
     try:
-        import carry as CARRY
+        import carry as CARRY, estrategico as ES
         c = CARRY.carry()
         if c:
             print(f"Carry: TPM {c['tpm']:.2f}% - Fed {c['us']:.2f}% = {c['diff']:+.2f}% (estratégico)")
+        r = ES.regimen()
+        if r:
+            print(f"Régimen: {r['nivel']} (VIX {r['vix']:.1f})")
+        v = ES.valoracion(a["price"])
+        if v:
+            print(f"Valoración 3a: percentil {v['pctl']}/100 (prom {v['prom']:.0f})")
     except Exception:
         pass
     print("\nPor que:")
@@ -720,6 +741,8 @@ def cmd_selftest():
     check("Calendario económico (ForexFactory)", lambda: CE.proximos(dias=5) is not None)
     check("Datos intradía 1h", lambda: len(__import__("intraday").candles_ohlc(C.SYM_USDCLP)) > 0)
     check("Carry (TPM Chile + tasa EE.UU.)", lambda: __import__("carry").carry())
+    check("Régimen de riesgo (VIX + S&P)", lambda: __import__("estrategico").regimen())
+    check("Valoración largo plazo (3 años)", lambda: __import__("estrategico").valoracion(1000))
     if a:
         check("Arma el mensaje del informe", lambda: bool(_fmt_analisis(a, con_noticias=False)))
         check("Genera el gráfico", lambda: CH.make_chart(a, os.path.join(HERE, "selftest.png")))
