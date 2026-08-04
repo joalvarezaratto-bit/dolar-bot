@@ -253,48 +253,43 @@ def _fmt_analisis(a, con_ia=True, con_noticias=True, solo_nuevas=False):
         except Exception as e:
             print("  (aviso) intradía:", str(e)[:60])
     L.append("")
-    L.append(f"Estado ahora: <b>{a['sesgo']}</b>")
-    L.append(f"<i>Fuerza de la presión: {a['score']:+d}/100 (describe el momento, no predice)</i>")
+    L.append(f"{a['emoji']} <b>{a['sesgo']}</b>  ·  fuerza {a['score']:+d}/100")
+    L.append("<i>(describe el momento actual, no predice)</i>")
 
-    # termometro cuantitativo: RSI, volatilidad y valor justo
-    stats = []
-    if a.get("rsi") is not None:
-        estado = "sobrecompra" if a["rsi"] >= 70 else ("sobreventa" if a["rsi"] <= 30 else "normal")
-        stats.append(f"RSI {a['rsi']:.0f} ({estado})")
-    if a.get("atr_pct") is not None:
-        stats.append(f"volatilidad ~{a['atr_pct']:.1f}%/día")
-    if stats:
-        L.append("📊 " + " · ".join(stats))
-    v = a.get("valor")
-    if v:
-        if v["z"] >= 1:
-            vtxt = f"dólar CARO ({v['gap']:+.0f} sobre {v['predicho']:.0f})"
-        elif v["z"] <= -1:
-            vtxt = f"dólar BARATO ({v['gap']:+.0f} bajo {v['predicho']:.0f})"
-        else:
-            vtxt = f"en línea ({v['gap']:+.0f} vs {v['predicho']:.0f})"
-        L.append(f"🎯 Valor justo (cobre+DXY+real): <b>{v['predicho']:.0f}</b> → {vtxt}")
-    L.append("")
-
-    # los motores, con su CORRELACION actual (que tan fuerte tira cada uno)
+    # ---- MOTORES: valor, correlacion y empuje sobre el dolar de cada uno ----
     cobre = a.get("cobre") or {}
     dxy = a.get("dxy") or {}
     brl = a.get("brl") or {}
     bono = a.get("bono") or {}
     cr = a.get("correls") or {}
+    ap_ = a.get("aportes") or {}
 
-    def _corr(k):
-        return f" · corr {cr[k]:+.2f}" if k in cr else ""
+    def _emp(k):
+        ap = ap_.get(k, 0)
+        return "↑" if ap > 1 else ("↓" if ap < -1 else "▪️")
 
-    if cobre.get("price") is not None:
-        L.append(f"🥇 Cobre: <b>{cobre['price']:.2f}</b> USD/lb ({cobre['change_pct']:+.2f}%){_corr('cobre')}")
-    if dxy.get("price") is not None:
-        L.append(f"💵 DXY: <b>{dxy['price']:.1f}</b> ({dxy['change_pct']:+.2f}%){_corr('dxy')}")
-    if brl.get("price") is not None:
-        L.append(f"🇧🇷 Real (USD/BRL): <b>{brl['price']:.2f}</b> ({brl['change_pct']:+.2f}%){_corr('brl')}")
-    if bono.get("price") is not None:
-        L.append(f"🏦 Bono 10Y USA: <b>{bono['price']:.2f}%</b> ({bono['change_pct']:+.2f}%){_corr('bono')}")
     L.append("")
+    L.append("⚙️ <b>MOTORES</b>  <i>(↑/↓ = empuje sobre el dólar hoy)</i>")
+    if cobre.get("price") is not None:
+        L.append(f"🥇 Cobre <b>{cobre['price']:.2f}</b> {cobre['change_pct']:+.2f}% · corr {cr.get('cobre', 0):+.2f} · {_emp('cobre')}")
+    if dxy.get("price") is not None:
+        L.append(f"💵 DXY <b>{dxy['price']:.1f}</b> {dxy['change_pct']:+.2f}% · corr {cr.get('dxy', 0):+.2f} · {_emp('dxy')}")
+    if brl.get("price") is not None:
+        L.append(f"🇧🇷 Real <b>{brl['price']:.2f}</b> {brl['change_pct']:+.2f}% · corr {cr.get('brl', 0):+.2f} · {_emp('brl')}")
+    if bono.get("price") is not None:
+        L.append(f"🏦 Bono10Y <b>{bono['price']:.2f}%</b> {bono['change_pct']:+.2f}% · corr {cr.get('bono', 0):+.2f} · {_emp('bono')}")
+
+    v = a.get("valor")
+    extra = []
+    if v:
+        vv = "dólar caro" if v["z"] >= 1 else ("dólar barato" if v["z"] <= -1 else "en línea")
+        extra.append(f"valor justo {v['predicho']:.0f} ({vv})")
+    if a.get("rsi") is not None:
+        extra.append(f"RSI {a['rsi']:.0f}")
+    if a.get("atr_pct") is not None:
+        extra.append(f"vol {a['atr_pct']:.1f}%/día")
+    if extra:
+        L.append("<i>➕ " + " · ".join(extra) + "</i>")
     # ===== CONTEXTO ESTRATÉGICO (largo plazo): carry + régimen + valoración =====
     estrat = []
     try:
@@ -315,41 +310,30 @@ def _fmt_analisis(a, con_ia=True, con_noticias=True, solo_nuevas=False):
     except Exception as e:
         print("  (aviso) estratégico:", str(e)[:60])
     if estrat:
-        L.append("🧭 <b>Contexto estratégico</b> (semanas/meses)")
+        L.append("")
+        L.append("🧭 <b>CONTEXTO ESTRATÉGICO</b>  <i>(semanas/meses)</i>")
         L.extend(estrat)
-        L.append("")
 
-    # por que (las senales mas fuertes)
-    if a["senales"]:
-        L.append("<b>Por qué:</b>")
-        for txt, ap in a["senales"][:5]:
-            flecha = "↑" if ap > 0 else "↓"
-            L.append(f"  {flecha} {txt}")
-        L.append("")
-
-    # niveles con distancia (soportes = pisos; resistencias = techos)
+    # ---- NIVELES ----
     price = a["price"]
+    L.append("")
+    L.append("🎚️ <b>NIVELES</b>")
     if a["resistencias"]:
-        L.append("🔴 Resistencias: " + " · ".join(
+        L.append("🔴 Resist.  " + "  ·  ".join(
             f"{p:,.0f} <i>(+{(p/price-1)*100:.1f}%)</i>" for p in a["resistencias"]))
     if a["soportes"]:
-        L.append("🟢 Soportes: " + " · ".join(
+        L.append("🟢 Soportes " + "  ·  ".join(
             f"{p:,.0f} <i>(-{(1-p/price)*100:.1f}%)</i>" for p in a["soportes"]))
-
-    # fibonacci del ultimo impulso
     fib = a.get("fib")
     if fib:
         rc, pc = fib["cerca"]
-        clave = [0.382, 0.5, 0.618]
-        niv = " · ".join(f"{r:.3f}→{fib['levels'][r]:.0f}" for r in clave)
-        L.append(f"📐 Fibonacci (impulso {fib['dir']} {fib['lo']:.0f}–{fib['hi']:.0f}): {niv}")
-        L.append(f"   <i>precio cerca del {rc:.3f} ({pc:.0f})</i>")
+        L.append(f"📐 Fibonacci: precio cerca del retroceso {rc:.3f} ({pc:.0f})")
 
-    # riesgos a vigilar
+    # ---- RIESGOS ----
     if a.get("riesgos"):
         L.append("")
-        L.append("⚠️ <b>Riesgos</b>")
-        for rg in a["riesgos"][:5]:
+        L.append("⚠️ <b>RIESGOS</b>")
+        for rg in a["riesgos"][:4]:
             L.append(f"  • {rg}")
 
     # reportes de HOY que ya salieron (con su resultado)
@@ -390,10 +374,8 @@ def _fmt_analisis(a, con_ia=True, con_noticias=True, solo_nuevas=False):
             L.append(f"🤖 <i>{c}</i>")
 
     L.append("")
-    L.append("<i>📌 Tablero de CONTEXTO en tiempo real: muestra qué mueve al peso ahora "
-             "(cobre inverso; DXY, real y bono 10Y directos), sus niveles y las noticias. "
-             "NO predice a dónde va el dólar — un backtest confirmó que el estado no anticipa "
-             "el movimiento del día siguiente. No es consejo de inversión.</i>")
+    L.append("<i>📌 Tablero de contexto en tiempo real — muestra qué mueve al peso ahora, "
+             "no predice a dónde va. No es consejo de inversión.</i>")
     return "\n".join(L)
 
 

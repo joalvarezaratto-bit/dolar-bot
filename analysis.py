@@ -198,6 +198,7 @@ def analizar():
     #    explicando al peso ESTAS semanas.
     nombres = {"cobre": ("Cobre", cobre), "dxy": ("DXY", dxy), "brl": ("Real (USD/BRL)", brl),
                "bono": ("Bono 10Y USA", bono)}
+    aportes = {}   # {motor: contribucion al puntaje} para mostrar el empuje de cada uno
     for k, (etq, dat) in nombres.items():
         if k not in correls or not dat or not dat.get("price"):
             continue
@@ -208,6 +209,7 @@ def analizar():
         sd = float(M.retornos(arr[k]).std()) if (arr is not None and k in arr) else 0.0
         z = (dat["change_pct"] / 100.0 / sd) if sd > 0 else 0.0
         ap = max(-16, min(16, corr * z * 12))
+        aportes[k] = ap
         if abs(ap) < 1:
             continue
         score += ap
@@ -286,6 +288,7 @@ def analizar():
         "rsi": rsi,
         "atr_pct": atrp,
         "correls": correls,
+        "aportes": aportes,
         "valor": valor,
         "fib": fib,
         "eventos": eventos,

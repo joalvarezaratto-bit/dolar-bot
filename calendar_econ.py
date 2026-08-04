@@ -91,7 +91,9 @@ def proximos(dias=3, solo_alto=False):
         if imp == "Medium" and not any(k in titulo.lower() for k in CLAVE):
             continue
         dias_falta = (f.date() - ahora.date()).days
-        cuando = "hoy" if dias_falta == 0 else ("mañana" if dias_falta == 1 else f"{f:%a %d}")
+        _dias = ["lun", "mar", "mié", "jue", "vie", "sáb", "dom"]
+        cuando = "hoy" if dias_falta == 0 else ("mañana" if dias_falta == 1
+                                                else f"{_dias[f.weekday()]} {f.day}")
         out.append({
             "cuando": cuando,
             "fecha": f,
@@ -262,8 +264,8 @@ def bloque_telegram(dias=3):
     evs = proximos(dias=dias)
     if not evs:
         return ""
-    L = ["🗓️ <b>Próximos reportes</b> (mueven el dólar)"]
-    for e in evs[:6]:
+    L = ["🗓️ <b>AGENDA</b>  <i>(reportes que mueven el dólar)</i>"]
+    for e in evs[:5]:
         alto = "🔴" if e["impacto"] == "High" else "🟡"
         tag = "🥇" if e["es_cobre"] else "💵"
         fc = f" · fc {e['forecast']}" if e["forecast"] else ""

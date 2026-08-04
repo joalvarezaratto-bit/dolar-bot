@@ -157,9 +157,19 @@ def _save_seen(firmas):
         pass
 
 
+# Términos de OTROS mercados (no mueven el USD/CLP): penalizan fuerte para que
+# no se cuele "dólar en Venezuela/Colombia/México/Perú".
+EXCL = ("venezuela", "bcv", "bolívar", "colombia", "banco de la república",
+        "banxico", "peso mexicano", "peso colombiano", "perú", "sol peruano",
+        "argentina", "peso argentino")
+
+
 def _score(titulo):
     t = _norm(titulo)
-    return sum(p for kw, p in KW.items() if kw in t)
+    s = sum(p for kw, p in KW.items() if kw in t)
+    if any(x in t for x in EXCL) and "chile" not in t:
+        s -= 8   # noticia de otro país: fuera salvo que sea muy relevante
+    return s
 
 
 # Notas de OTROS paises (sobre todo el peso mexicano) que se cuelan por la
