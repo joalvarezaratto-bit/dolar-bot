@@ -294,6 +294,14 @@ def _fmt_analisis(a, con_ia=True, con_noticias=True, solo_nuevas=False):
         L.append(f"🇧🇷 Real (USD/BRL): <b>{brl['price']:.2f}</b> ({brl['change_pct']:+.2f}%){_corr('brl')}")
     if bono.get("price") is not None:
         L.append(f"🏦 Bono 10Y USA: <b>{bono['price']:.2f}%</b> ({bono['change_pct']:+.2f}%){_corr('bono')}")
+    # carry: contexto estratégico (diferencial de tasas), no señal diaria
+    try:
+        import carry as CARRY
+        cl = CARRY.carry_line()
+        if cl:
+            L.append(cl)
+    except Exception as e:
+        print("  (aviso) carry:", str(e)[:60])
     L.append("")
 
     # por que (las senales mas fuertes)
@@ -448,6 +456,13 @@ def cmd_print():
     bono = a.get("bono") or {}
     if bono.get("price"):
         print(f"10Y:   {bono['price']:.2f}% ({bono['change_pct']:+.2f}%) - {a['trend_bono'][0]}")
+    try:
+        import carry as CARRY
+        c = CARRY.carry()
+        if c:
+            print(f"Carry: TPM {c['tpm']:.2f}% - Fed {c['us']:.2f}% = {c['diff']:+.2f}% (estratégico)")
+    except Exception:
+        pass
     print("\nPor que:")
     for txt, ap in a["senales"]:
         print(f"  {'↑' if ap>0 else '↓'} {txt}  [{ap:+.0f}]")
@@ -704,6 +719,7 @@ def cmd_selftest():
     check("Noticias (Google News)", lambda: NW.buscar(top=3, min_score=3) is not None)
     check("Calendario económico (ForexFactory)", lambda: CE.proximos(dias=5) is not None)
     check("Datos intradía 1h", lambda: len(__import__("intraday").candles_ohlc(C.SYM_USDCLP)) > 0)
+    check("Carry (TPM Chile + tasa EE.UU.)", lambda: __import__("carry").carry())
     if a:
         check("Arma el mensaje del informe", lambda: bool(_fmt_analisis(a, con_noticias=False)))
         check("Genera el gráfico", lambda: CH.make_chart(a, os.path.join(HERE, "selftest.png")))

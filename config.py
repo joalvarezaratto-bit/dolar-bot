@@ -60,6 +60,11 @@ SYM_COBRE = "HG=F"         # cobre (futuro COMEX, USD por libra)
 SYM_DXY = "DX-Y.NYB"       # indice dolar (dolar contra canasta de monedas)
 SYM_BRL = "USDBRL=X"       # dolar / real brasileño (el CLP sigue mucho al real)
 SYM_BONO = "^TNX"          # bono del Tesoro USA 10 años (tasas -> apetito por riesgo EM)
+SYM_IRX = "^IRX"           # T-bill EE.UU. 13 semanas (proxy tasa Fed, para el carry)
+
+# TPM de Chile de respaldo (%), por si mindicador.cl no responde. Actualízala
+# cuando el Banco Central mueva la tasa (sale en las noticias del bot).
+TPM_FALLBACK = 4.5
 
 # ---------------------------------------------------------------------
 #  Cada cuantos minutos revisa el vigilante (--watch).

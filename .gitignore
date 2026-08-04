@@ -4,6 +4,7 @@ secrets_local.py
 # Cachés y temporales (se regeneran solos)
 market_cache.json
 calendar_cache.json
+tpm_cache.json
 ai_breaker.json
 usdclp.png
 __pycache__/
